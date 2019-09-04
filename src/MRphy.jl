@@ -44,7 +44,6 @@ Sugar for creating `<:T` typed array of arbitrary dimensions.
 """
 TypeND(T::Type, ::Colon) = AbstractArray{<:T}
 
-
 ## Unitful types
 export B0D, Γ0D, L0D, K0D, T0D, F0D, GR0D, RF0D
 B0D,  Γ0D  = Quantity{<:Real, 𝐁},   Quantity{<:Real, 𝚪}
@@ -67,8 +66,9 @@ const γ¹H = 4257.6u"Hz/Gauss"
 # called by the sub-scripts.
 
 include("utils.jl")
-include("mObjects.jl")
+include("SteadyStates.jl")
 include("blochSim.jl")
+include("mObjects.jl")
 
 end # module
 
