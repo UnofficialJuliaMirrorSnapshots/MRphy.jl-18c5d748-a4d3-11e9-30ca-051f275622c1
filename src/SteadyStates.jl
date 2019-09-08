@@ -1,3 +1,4 @@
+export SteadyStates
 """
     SteadyStates
 Some steady state properties of common sequences.
@@ -6,11 +7,12 @@ module SteadyStates
 using ..MRphy
 using ..Unitful, ..UnitfulMR
 
+export Signal
 """
-    signal
+    Signal
 Analytical expressions of common steady states sequences signals.
 """
-module signal
+module Signal
 using ..MRphy
 using ..Unitful, ..UnitfulMR
 
@@ -31,9 +33,9 @@ using ..Unitful, ..UnitfulMR
 function bSSFP(α::Real;
                TR::T0D,
                Δf::F0D=0u"Hz",
-               T1::T0D=(inf)u"s",
-               T2::T0D=(inf)u"s")
-  E1, E2, ϕ = exp(-TR/T1), exp(-TR/T2), 2π*Δf*TR
+               T1::T0D=1u"s",
+               T2::T0D=(6e-2)u"s")
+  E1, E2, ϕ = exp(-TR/T1), exp(-TR/T2), 2π*Δf*TR # jmri.24163 typoed on E₁, E₂.
   C, D = E2*(E1-1)*(1+cosd(α)), (1-E1*cosd(α)) - (E1-cosd(α))*E2^2
   sig = sind(α) * (1-E1)*(1-E2*exp(-1im*ϕ)) / (C*cos(ϕ) + D)
   return sig
@@ -51,7 +53,7 @@ end
 *OUTPUTS*:
 - `sig::Real` (1,), steady-state signal.
 """
-SPGR(α::Real; TR::T0D, T1::T0D=(inf)u"s") =
+SPGR(α::Real; TR::T0D, T1::T0D=1u"s") =
   sind(α) * (1-exp(-TR/T1))/(1-cosd(α)*exp(-TR/T1));
 
 """
@@ -74,25 +76,26 @@ SPGR(α::Real; TR::T0D, T1::T0D=(inf)u"s") =
 function STFR(α::Real, β::Real;
               ϕ::Real=0,
               Δf::F0D=0u"Hz",
-              T1::T0D=(inf)u"s",
-              T2::T0D=(inf)u"s",
-              Tg::T0D=0u"s",
-              Tf::T0D=(1e-4)u"s")
+              T1::T0D=1u"s",
+              T2::T0D=(6e-2)u"s",
+              Tg::T0D=(2e-3)u"s",
+              Tf::T0D=(1e-2)u"s")
   cΔϕ = cos(2π*Δf*Tf - ϕ) # θf ≔ 2π*Δf*Tf
   Eg, Ef1, Ef2 = exp(-Tg/T1), exp(-Tf/T1), exp(-Tf/T2)
   sα, cα, sβ, cβ = sind(α), cosd(α), sind(β), cosd(β)
 
-  sig = sα * (Eg*(1-Ef1)*cβ + (1-Eg)) / (1-Eg*Ef*sα*sβ*cΔϕ-Eg*Ef*cα*cβ)
+  sig = sα * (Eg*(1-Ef1)*cβ + (1-Eg)) / (1-Eg*Ef2*sα*sβ*cΔϕ-Eg*Ef1*cα*cβ)
   return sig
 end
 
-end # module signal
+end # module Signal
 
+export RFSpoiling
 """
-    rfSpoiling
+    RFSpoiling
 Tools for simulating rf spoiling in gradient echo sequences.
 """
-module rfSpoiling
+module RFSpoiling
 using ..MRphy
 using ..Unitful, ..UnitfulMR
 """
@@ -100,7 +103,7 @@ using ..Unitful, ..UnitfulMR
 Quadratically cycling phases in (°): Φ(n) = mod.(C⋅n² + B⋅n + A, 360), n=0:nTR-1
 """
 QuadPhase(nTR::Integer, C::Real, B::Real=0, A::Real=0) =
-  mod((0:nTR-1|>n->C*n.^2 .+B*n .+A), 360)
+  mod.(([0:nTR-1 ...]|>n->C*n.^2 .+B*n .+A), 360)
 
 """
     FZstates(Φ, α; TR, T1, T2, FZ)
@@ -128,13 +131,19 @@ can be computed by convolving a sinc with the m⋅2π dephased results.
 - `FZ::NamedTuple`, `(Fs,Fcs,Zs)`, simulation results.
 """
 function FZstates(Φ ::TypeND(Real,[2]), α::Real;
-                  TR::T0D,
-                  T1::T0D=(inf)u"s",
-                  T2::T0D=(inf)u"s",
+                  TR::T0D=(50e-3)u"s",
+                  T1::T0D=(1.470)u"s",
+                  T2::T0D=(71e-3)u"s",
                   FZ::Union{Nothing, NamedTuple}=nothing)
-  !isnothing(FZ) || (FZ = ( Fs =Complex(zeros(size(Φ))),
-                            Fcs=Complex(zeros(size(Φ))),
-                            Zs =Complex(zeros(size(Φ))) ) )
+  if isnothing(FZ)
+    (Fs, Fcs, Zs) = (zeros(Complex{Float64}, size(Φ)) for _ in 1:3)
+    Zs[:, 1] .= 1
+    FZ = (Fs=Fs, Fcs=Fcs, Zs=Zs)
+  end
+  eltype(Φ) <: AbstractFloat || (Φ = float(Φ))
+  eltype(Fs)==Complex{Float64}  || (Fs  = Complex{Float64}(Fs))
+  eltype(Fcs)==Complex{Float64} || (Fcs = Complex{Float64}(Fcs))
+  eltype(Zs)==Complex{Float64}  || (Zs  = Complex{Float64}(Zs))
 
   size(FZ.Fs)==size(FZ.Fcs)==size(FZ.Zs) || throw(DimensionMismatch)
 
@@ -143,35 +152,40 @@ function FZstates(Φ ::TypeND(Real,[2]), α::Real;
   return FZ = _FZstates(Φ, α; E1=E1, E2=E2, FZ...)
 end
 
-function _FZstates(Φ ::TypeND(Real,[2]), α::Real;
+function _FZstates(Φ ::TypeND(AbstractFloat,[2]), α::Real;
                    E1::Real,
                    E2::Real,
                    Fs ::TypeND(Complex,[2]),
                    Fcs::TypeND(Complex,[2]),
                    Zs ::TypeND(Complex,[2]))
-  Φ *= π/180
-  Fs⁺, Fcs⁺, Zs⁺ = similar(Fs), similar(Fcs), similar(Zs) # post-rf states
+  Φ .= mod.(Φ, 360)
+  Φ .*= π/180
 
-  c½α², s½α², cα, sα = cosd(α/2)^2, sind(α/2)^2, cosd(α), sind(α);
+  Fs⁻, Fcs⁻, Zs⁻ = similar(Fs), similar(Fcs), similar(Zs) # pre-rf states
+  Fcs⁻[:,end] .= 0
 
-  for ϕ in eachcol(Φ)
-    # excitation; eq.(7)
-    ieϕsαr2, e2ϕs½α² = im*exp(im*ϕ)*sα/√(2), exp(im*2*ϕ)*s½α²
+  c½α², s½α², cα, sα = cosd(α/2)^2, sind(α/2)^2, cosd(α), sind(α)
+  ieΦsαr2, e2Φs½α² = im*exp.(im*Φ)*sα/√(2), exp.(im*2*Φ)*s½α²
 
-    Fs⁺  .=          c½α².*Fs .+ e2ϕs½α².*Fcs .-       ieϕsαr2.*Zs
-    Fcs⁺ .= conj(e2ϕs½α²).*Fs .+    c½α².*Fcs .- conj(ieϕsαr2).*Zs
-    Zs⁺  .= conj(ieϕsαr2).*Fs .+ ieϕsαr2.*Fcs .+            cα.*Zs
-
+  @inbounds for t in axes(Φ,2)
     # relaxation and updating pre-rf states; eq.(8)
-    Fs .= E2.*[conj(Fcs⁺[:,2]) Fs⁺[:,1:end-1]]
-    Fcs[:, 1:end-1] .= E2.*Fcs⁺[:,2:end]
-    Zs .= E1.*Zs⁺ .+ (1-E1)
+    Fs⁻ .= E2.*[conj(Fcs[:,2]) Fs[:,1:end-1]]
+    Fcs⁻[:, 1:end-1] .= E2.*Fcs[:,2:end]
+    Zs⁻ .= E1.*Zs
+    Zs⁻[:,1] .+= (1-E1)
+
+    # excitation; eq.(7)
+    ieϕsαr2, e2ϕs½α² = view(ieΦsαr2,:,t), view(e2Φs½α²,:,t)
+
+    Fs  .=          c½α².*Fs⁻ .+ e2ϕs½α².*Fcs⁻ .-       ieϕsαr2.*Zs⁻
+    Fcs .= conj(e2ϕs½α²).*Fs⁻ .+    c½α².*Fcs⁻ .- conj(ieϕsαr2).*Zs⁻
+    Zs  .= conj(ieϕsαr2).*Fs⁻ .+ ieϕsαr2.*Fcs⁻ .+            cα.*Zs⁻
   end
 
   return (Fs=Fs, Fcs=Fcs, Zs=Zs)
 end
 
-end # module rfSpoiling
+end # module RFSpoiling
 
 end # module SteadyStates
 
