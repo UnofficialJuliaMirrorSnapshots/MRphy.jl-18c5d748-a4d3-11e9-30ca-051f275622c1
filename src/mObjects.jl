@@ -1,5 +1,5 @@
 
-error_ImmutableField(x) = ErrorException("`$x` is an immutable field.")
+error_ImmutableField(x) = ArgumentError("`$x` is an immutable field.")
 
 #= Pulse =#
 
