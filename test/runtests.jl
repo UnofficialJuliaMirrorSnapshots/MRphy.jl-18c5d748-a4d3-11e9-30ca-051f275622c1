@@ -2,6 +2,7 @@ using Test
 using Unitful, UnitfulMR
 
 using MRphy
+using MRphy.utils
 
 @time begin
 
