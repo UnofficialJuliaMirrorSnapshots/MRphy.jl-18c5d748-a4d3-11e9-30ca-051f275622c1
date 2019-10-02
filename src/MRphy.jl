@@ -51,7 +51,7 @@ TypeND(T::Type, ::Colon) = AbstractArray{<:T}
 ## Unitful types
 export B0D, Γ0D, L0D, K0D, T0D, F0D, GR0D, RF0D, SL0D
 """
-    B0D = Quantity{<:Real, 𝐁}
+    B0D{T<:Real} = Quantity{T, 𝐁}
 Type of magetic field strength. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -61,10 +61,10 @@ julia> (1u"Gauss")::B0D
 1 Gauss
 ```
 """
-B0D = Quantity{<:Real, 𝐁}
+B0D{T<:Real} = Quantity{T, 𝐁}
 
 """
-    Γ0D = Quantity{<:Real, 𝚪}
+    Γ0D{T<:Real} = Quantity{T, 𝚪}
 Type of gyro magnetic ratio. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -74,10 +74,10 @@ julia> (1u"Hz/Gauss")::Γ0D
 1 Hz Gauss^-1
 ```
 """
-Γ0D = Quantity{<:Real, 𝚪}
+Γ0D{T<:Real} = Quantity{T, 𝚪}
 
 """
-    L0D = Quantity{<:Real, 𝐋}
+    L0D{T<:Real} = Quantity{T, 𝐋}
 Type of length. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -87,10 +87,10 @@ julia> (1u"cm")::L0D
 1 cm
 ```
 """
-L0D = Quantity{<:Real, 𝐋}
+L0D{T<:Real} = Quantity{T, 𝐋}
 
 """
-    K0D =  Quantity{<:Real, 𝐊}
+    K0D{T<:Real} = Quantity{T, 𝐊}
 Type of spatial frequency. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -100,10 +100,10 @@ julia> (1u"cm^-1")::K0D
 1 cm^-1
 ```
 """
-K0D =  Quantity{<:Real, 𝐊}
+K0D{T<:Real} = Quantity{T, 𝐊}
 
 """
-    T0D = Quantity{<:Real, 𝐓}
+    T0D{T<:Real} = Quantity{T, 𝐓}
 Type of time. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -113,10 +113,10 @@ julia> (1u"s")::T0D
 1 s
 ```
 """
-T0D = Quantity{<:Real, 𝐓}
+T0D{T<:Real} = Quantity{T, 𝐓}
 
 """
-    F0D =  Quantity{<:Real, 𝐅}
+    F0D{T<:Real} = Quantity{T, 𝐅}
 Type of temporal frequency. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -126,10 +126,10 @@ julia> (1u"s^-1")::F0D
 1 s^-1
 ```
 """
-F0D =  Quantity{<:Real, 𝐅}
+F0D{T<:Real} = Quantity{T, 𝐅}
 
 """
-    GR0D = Quantity{<:Real, 𝐁/𝐋}
+    GR0D{T<:Real} = Quantity{T, 𝐁/𝐋}
 Type of magnetic gradient. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -139,10 +139,10 @@ julia> (1u"Gauss/cm")::GR0D
 1 Gauss cm^-1
 ```
 """
-GR0D = Quantity{<:Real, 𝐁/𝐋}
+GR0D{T<:Real} = Quantity{T, 𝐁/𝐋}
 
 """
-    SL0D = Quantity{<:Real, 𝐁/𝐋/𝐓}
+    SL0D{T<:Real} = Quantity{T, 𝐁/𝐋/𝐓}
 Type of magnetic gradient. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -152,10 +152,10 @@ julia> (1u"Gauss/cm/s")::SL0D
 1 Gauss cm^-1 s^-1
 ```
 """
-SL0D = Quantity{<:Real, 𝐁/𝐋/𝐓}
+SL0D{T<:Real} = Quantity{T, 𝐁/𝐋/𝐓}
 
 """
-    RF0D = Quantity{<:Union{Real, Complex}, 𝐁}
+    RF0D{T<:Complex} = Quantity{T, 𝐁}
 Type of magnetic RF. Based on
 [`Unitful.Quantity`](https://github.com/PainterQubits/Unitful.jl).
 
@@ -165,7 +165,7 @@ julia> ((1+1im)u"Gauss")::RF0D
 1 + 1im Gauss
 ```
 """
-RF0D = Quantity{<:Union{Real, Complex}, 𝐁}
+RF0D{T<:Complex} = Quantity{T, 𝐁}
 
 # const
 export γ¹H

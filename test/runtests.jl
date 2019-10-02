@@ -47,7 +47,7 @@ end
 #= Core Features Tests =#
 M0, nt = [1. 0. 0.; 0. 1. 0.; 0. 0. 1.], 512
 nM_spa, t = size(M0,1), 0:nt-1
-fov = [3 3 1]u"cm"
+fov = [3. 3. 1.]u"cm"
 γ = γ¹H
 γ_unitless = ustrip(Float64, u"Hz/Gauss",γ)
 
@@ -121,7 +121,7 @@ t_fp = (1/4/γ_unitless)u"s"
   M0f = copy(M0)
   M0f[:,1:2] .*= E2
   M0f[:,3]   .*= E1
-  M0f[:,3]   .+= (1-E1)
+  M0f[:,3]   .+= (1 .- E1)
 
   M0f[:,1:2] .= eΔθ.*(M0f[:,1]+1im*M0f[:,2]) |> x->[real(x) imag(x)]
 

@@ -9,7 +9,7 @@ An abstract type for pulses.
 
 See also: [`Pulse`](@ref).
 """
-abstract type AbstractPulse end
+abstract type AbstractPulse{T} end
 
 ## Basics
 Base.isequal(a::AbstractPulse, b::AbstractPulse) =
@@ -26,35 +26,37 @@ A struct for typical MR pulses: `Pulse <: AbstractPulse`.
 - `dt::T0D` (1,), simulation temporal step size, i.e., dwell time.
 - `des::String`, an description of the pulse to be constructed.
 
-# Usages:
-    Pulse(rf, gr; dt=(4e-6)u"s", des="generic pulse")
-
 See also: [`AbstractPulse`](@ref).
 """
-mutable struct Pulse <: AbstractPulse
-  rf::TypeND(RF0D, [1,2])
-  gr::TypeND(GR0D, [2])
-  dt::T0D
+mutable struct Pulse{T<:AbstractFloat,
+                     Trf<:TypeND(RF0D{Complex{T}},[1,2]),
+                     Tgr<:TypeND(GR0D{T},[2])} <: AbstractPulse{T}
+  rf::Trf
+  gr::Tgr
+  dt::T0D{T}
   des::String
+end
 
-  function Pulse(rf=missing, gr=missing; dt=4e-6u"s", des="generic pulse")
-    rf_miss, gr_miss = ismissing(rf), ismissing(gr)
-    rf_miss&&gr_miss && ErrorException("Missing both inputs.")
-    if rf_miss rf = zeros(size(gr,1))u"Gauss" end
-    if gr_miss gr = zeros(size(rf,1),3)u"Gauss/cm" end
-    size(gr,2)==3 || throw(DimensionMismatch)
+"""
+    Pulse(rf, gr; dt=(4e-6)u"s", des="generic pulse")
+Create `Pulse` object with prescribed parameters.
+"""
+function Pulse(rf=missing, gr=missing; dt=4e-6u"s", des="generic pulse")
+  rf_miss, gr_miss = ismissing(rf), ismissing(gr)
+  rf_miss&&gr_miss && ErrorException("Missing both inputs.")
+  if rf_miss rf = zeros(size(gr,1))u"Gauss" end
+  if gr_miss gr = zeros(size(rf,1),3)u"Gauss/cm" end
+  size(gr,2)==3 || throw(DimensionMismatch)
 
-    if isa(rf, Number) rf = [rf] end
-    return new(rf, gr, dt, des)
-  end
-
+  if isa(rf, Number) rf = [rf] end
+  return Pulse(rf, gr, dt, des)
 end
 
 ## set and get
 Base.setproperty!(p::Pulse, sym::Symbol, x) = begin
   if (sym==:gr) size(x)==(size(p.rf,1),3)||throw(DimensionMismatch) end
   if (sym==:rf) size(x,1)==size(p.gr,1)||throw(DimensionMismatch) end
-  setfield!(p, sym, x)
+  setfield!(p, sym, convert(fieldtype(typeof(p), sym), x))
 end
 
 #= Spin =#
@@ -69,7 +71,7 @@ Might make `AbstractSpinArray <: AbstractArray` in a future version
 
 See also: [`mSpinArray`](@ref), [`AbstractSpinCube`](@ref).
 """
-abstract type AbstractSpinArray end
+abstract type AbstractSpinArray{T} end
 
 ## set and get
 Base.setproperty!(spa::AbstractSpinArray, s::Symbol, x) = begin
@@ -79,7 +81,7 @@ Base.setproperty!(spa::AbstractSpinArray, s::Symbol, x) = begin
   if (s==:M)&&(size(x,1)==1) x=repeat(x, nM, 1) end
   if (s ∈ (:T1,:T2,:γ,:M)) size(x,1)∈(1,nM)||throw(DimensionMismatch) end
 
-  setfield!(spa, s, x)
+  setfield!(spa, s, convert(fieldtype(typeof(spa),s), x))
 end
 
 ## AbstractArray-like interface
@@ -92,8 +94,6 @@ Base.isequal(a::AbstractSpinArray, b::AbstractSpinArray) =
 ## Concrete mSpinArray
 export mSpinArray
 """
-    mSpinArray(dim::Dims; T1=1.47u"s", T2=0.07u"s", γ=γ¹H, M=[0. 0. 1.])
-    mSpinArray(mask::BitArray; T1=1.47u"s", T2=0.07u"s", γ=γ¹H, M=[0. 0. 1.])
 An exemplary struct instantiating `AbstractSpinArray`.
 
 # Fields:
@@ -113,30 +113,41 @@ extensional subtypes specialized for, e.g., arterial spin labelling.
 
 See also: [`AbstractSpinArray`](@ref).
 """
-mutable struct mSpinArray <: AbstractSpinArray
+mutable struct mSpinArray{T<:AbstractFloat,
+                          TT1<:TypeND(T0D{T}, [0,1]),
+                          TT2<:TypeND(T0D{T}, [0,1]),
+                          Tγ <:TypeND(Γ0D{T}, [0,1]),
+                          TM <:AbstractArray{T,2}} <: AbstractSpinArray{T}
   # *Immutable*:
   dim ::Dims
   mask::BitArray
   # *Mutable*:
-  T1 ::TypeND(T0D, [0,1])
-  T2 ::TypeND(T0D, [0,1])
-  γ  ::TypeND(Γ0D, [0,1])
-  M  ::TypeND(AbstractFloat, [2])
-
-  function mSpinArray(mask::BitArray;
-                      T1=1.47u"s", T2=0.07u"s", γ=γ¹H, M=[0. 0. 1.])
-    dim = size(mask)
-    nM = prod(dim)
-    M = eltype(M)<:AbstractFloat ? M : float(M)
-    if size(M,1)==1 M=repeat(M, nM, 1) end
-    (all(map(x->(size(x,1) ∈ (1,nM)), [T1,T2,γ,M]))) || throw(DimensionMismatch)
-
-    return new(dim, mask, T1, T2, γ, M)
-  end
-
-  mSpinArray(dim::Dims=(1,); kw...) = mSpinArray(trues(dim); kw...)
-
+  T1::TT1
+  T2::TT2
+  γ ::Tγ
+  M ::TM
 end
+
+"""
+    mSpinArray(mask::BitArray; T1=1.47u"s", T2=0.07u"s", γ=γ¹H, M=[0. 0. 1.])
+Create `mSpinArray` object with prescribed parameters, with `dim = size(mask)`.
+"""
+function mSpinArray(mask::BitArray;
+                    T1=1.47u"s", T2=0.07u"s", γ=γ¹H, M=[0. 0. 1.])
+  dim = size(mask)
+  nM = prod(dim)
+  M = eltype(M)<:AbstractFloat ? M : float(M)
+  if size(M,1)==1 M=repeat(M, nM, 1) end
+  (all(map(x->(size(x,1) ∈ (1,nM)), [T1,T2,γ,M]))) || throw(DimensionMismatch)
+
+  return mSpinArray(dim, mask, T1, T2, γ, M)
+end
+
+"""
+    mSpinArray(dim::Dims; T1=1.47u"s", T2=0.07u"s", γ=γ¹H, M=[0. 0. 1.])
+Create `mSpinArray` object with prescribed parameters, with `mask = trues(dim)`.
+"""
+mSpinArray(dim::Dims=(1,); kw...) = mSpinArray(trues(dim); kw...)
 
 #= Cube =#
 
@@ -148,12 +159,14 @@ contain all fields listed in the exemplary struct `mSpinCube`.
 
 See also: [`AbstractSpinArray`](@ref), [`mSpinCube`](@ref).
 """
-abstract type AbstractSpinCube <: AbstractSpinArray end
+abstract type AbstractSpinCube{T} <: AbstractSpinArray{T} end
 
 ## set and get
 Base.setproperty!(cb::AbstractSpinCube, s::Symbol, x) = begin
   s ∈ (:spinarray,:fov,:ofst,:loc) && throw(ExceptionImmutableField(s))
-  s ∈ fieldnames(typeof(cb)) ? setfield!(cb, s,x) : setfield!(cb.spinarray, s,x)
+  s ∈ fieldnames(typeof(cb)) ?
+    setfield!(cb, s,convert(fieldtype(typeof(cb),s), x)) :
+    setproperty!(cb.spinarray, s,x)
 end
 
 Base.getproperty(cb::AbstractSpinCube, s::Symbol) =
@@ -168,10 +181,6 @@ Base.isequal(a::AbstractSpinCube, b::AbstractSpinCube) =
 ## Concrete mSpinCube
 export mSpinCube
 """
-    spincube = mSpinCube(dim::Dims{3}, fov; ofst, Δf, T1, T2, γ)
-    spincube = mSpinCube(mask::BitArray{3}, fov; ofst, Δf, T1, T2, γ)
-`dim`, `mask`, `T1`, `T2`, and `γ` are passed to `mSpinArray` constructors.
-
 An exemplary struct instantiating `AbstractSpinCube`, designed to model a set of
 regularly spaced spins, e.g., a volume.
 
@@ -186,27 +195,40 @@ regularly spaced spins, e.g., a volume.
 
 See also: [`AbstractSpinCube`](@ref).
 """
-mutable struct mSpinCube <: AbstractSpinCube
+mutable struct mSpinCube{T<:AbstractFloat,
+                         Tfov <:TypeND(L0D{T}, [2]),
+                         Tofst<:TypeND(L0D{T}, [2]),
+                         Tloc <:TypeND(L0D{T}, [2]),
+                         TΔf  <:TypeND(F0D{T}, [0,1])} <: AbstractSpinCube{T}
   # *Immutable*:
-  spinarray::AbstractSpinArray
-  fov ::TypeND(L0D, [2])
-  ofst::TypeND(L0D, [2])
-  loc ::TypeND(L0D, [2])
+  spinarray::AbstractSpinArray{T}
+  fov ::Tfov
+  ofst::Tofst
+  loc ::Tloc
   # *Mutable*:
-  Δf  ::TypeND(F0D, [0,1])
-
-  function mSpinCube(mask::BitArray{3}, fov::TypeND(L0D, [2]);
-                     ofst::TypeND(L0D, [2])=[0 0 0]u"cm", Δf=0u"Hz",
-                     T1=1.47u"s", T2=0.07u"s", γ=γ¹H)
-    size(fov)==size(ofst)==(1,3) || throw(DimensionMismatch)
-    spa = mSpinArray(mask; T1=T1, T2=T2, γ=γ)
-    loc = CartesianLocations(spa.dim)./(reshape([spa.dim...], 1,:)./fov) .+ ofst
-    return new(spa, fov, ofst, loc, Δf)
-  end
-
-  mSpinCube(dim::Dims{3}, a...; kw...) = mSpinCube(trues(dim), a...; kw...)
-
+  Δf  ::TΔf
 end
+
+"""
+    spincube = mSpinCube(mask::BitArray{3}, fov; ofst, Δf, T1, T2, γ)
+`dim`, `mask`, `T1`, `T2`, and `γ` are passed to `mSpinArray` constructors.
+
+Create `mSpinCube` object with prescribed parameters, with `dim = size(mask)`.
+"""
+function mSpinCube(mask::BitArray{3}, fov::TypeND(L0D, [2]);
+                   ofst::TypeND(L0D, [2])=[0. 0. 0.]u"cm", Δf=0.0u"Hz",
+                   T1=1.47u"s", T2=0.07u"s", γ=γ¹H)
+  size(fov)==size(ofst)==(1,3) || throw(DimensionMismatch)
+  spa = mSpinArray(mask; T1=T1, T2=T2, γ=γ)
+  loc = CartesianLocations(spa.dim)./(reshape([spa.dim...], 1,:)./fov) .+ ofst
+  return mSpinCube(spa, fov, ofst, loc, Δf)
+end
+
+"""
+    spincube = mSpinCube(dim::Dims{3}, fov; ofst, Δf, T1, T2, γ)
+Create `mSpinCube` object with prescribed parameters, with `mask = trues(dim)`.
+"""
+mSpinCube(dim::Dims{3}, a...; kw...) = mSpinCube(trues(dim), a...; kw...)
 
 #= Bolus (*Under Construction*) =#
 # TODO
@@ -220,7 +242,7 @@ contain all fields listed in the exemplary struct `mSpinBolus`.
 
 See also: [`AbstractSpinArray`](@ref), [`mSpinBolus`](@ref).
 """
-abstract type AbstractSpinBolus <: AbstractSpinArray end
+abstract type AbstractSpinBolus{T} <: AbstractSpinArray{T} end
 
 ## set and get
 
@@ -243,7 +265,7 @@ of moving spins, e.g., a blood bolus in ASL context.
 
 See also: [`AbstractSpinBolus`](@ref).
 """
-mutable struct mSpinBolus <: AbstractSpinBolus
+mutable struct mSpinBolus{T} <: AbstractSpinBolus{T}
   # *Immutable*:
   # *Mutable*:
 end
